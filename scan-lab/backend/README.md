@@ -62,3 +62,15 @@ Erzeugt wurde ein synthetischer Wurld-Datensatz aus dem Wurld-Demo und eine kün
 - Stray-RGBD-Referenzpipeline: https://github.com/MichaelFowler1/lidar-scan-pipeline ; aktuelle Version ist nicht kommerziell lizenziert. Kein Code daraus wurde übernommen.
 
 Mit der Anzahl generierter Punkte steigt die echte Sensorinformation nicht automatisch. Interpolierte oder KI-geschätzte Geometrie ist von gemessenen Daten zu unterscheiden.
+
+## Update: Ausrichtungsprüfung und Bildgrößen
+
+Die automatische Registrierung überprüft nun den Überlappungswert in beiden Richtungen. Dies kann manche asymmetrische Fehlanpassung erkennen, aber auch ein hoher Wert belegt keine korrekte Zuordnung bei symmetrischen Objekten.
+
+Bei unterschiedlichen RGB-/Tiefenauflösungen bricht die Software standardmäßig weiterhin ab. Nur wenn anhand der jeweiligen Aufnahme und Kalibrierung nachgewiesen wurde, dass beide Bilder denselben Ausschnitt und dieselbe optische Projektion verwenden, kann `--aligned-depth` die Kameraintrinsik auf die Tiefenauflösung skalieren. Unterschiedliche Bildausschnitte, Verzeichnung oder getrennte optische Zentren werden dadurch nicht korrigiert. WurldCam-Aufnahmen mit unterschiedlichen Stream-Größen sind damit nicht pauschal automatisch validiert.
+
+Für jeden verarbeiteten Frame enthält der Bericht zusätzlich Prozentwerte für Distanzen bis 1, 2, 3, 4 und 5 Meter; Nenner sind sämtliche Tiefenpixel des jeweiligen Frames. Ein positiver numerischer Messwert ist nicht zwingend zuverlässig.
+
+## Untersuchter TSDF-Weg – noch nicht freigegeben
+
+Die volumetrische TSDF-Integration mit Open3D 0.20.0 wurde an einer künstlichen Ebene mit bekanntem Abstand und am synthetischen Wurld-Beispiel ausprobiert. In der aktuellen Testumgebung wurde trotz gültiger Eingabewerte keine Oberfläche erzeugt. Die Ursache ist bisher ungeklärt. Deshalb wurde diese Funktion nicht in den ausführbaren Backend-Weg aufgenommen; eine erfolgreiche Rekonstruktion wäre derzeit nicht seriös zugesichert. Für den weiteren Ausbau sind reproduzierbare Minimaltests, Ursachenanalyse, geometrische Ground-Truth-Messungen und reale iPhone-Datensätze nötig.
