@@ -42,7 +42,7 @@ Ausgaben:
 
 - RGB-Farben und Confidence-Maskierung werden in der aktuellen Version nicht in die Punktwolken übernommen, obwohl sie in den Quelldaten vorhanden sein können.
 - Kein Webserver/GUI oder Handy-Direktübertragung; Upload ist manuelles Dateikopieren.
-- Kein echtes Multi-View-Fotogrammetrie-, Gaussian-Splatting- oder TSDF-Backend. Die drei Vergleichsstrategien sind Punktwolkenvarianten, kein Ersatz für einen systematischen Vergleich unterschiedlicher Rekonstruktionsalgorithmen.
+- Kein echtes Multi-View-Fotogrammetrie- oder Gaussian-Splatting-Backend. Die drei ursprünglichen Vergleichsstrategien sind Punktwolkenvarianten; die zusätzliche CPU-TSDF-Variante ist experimentell.
 - Nur unterstützte Wurld-Kameramodelle `PINHOLE` und `SIMPLE_PINHOLE` mit Kameraintrinsik auf Tiefenbildauflösung. Andere Modelle oder abweichende Auflösungen werden abgelehnt, anstatt ungeprüft kalibriert zu werden.
 - `wurld` verarbeitet Stray über seinen Konverter. Laut upstream ist die reale Gerätevalidierung der Konventionen noch offen. Es gibt Hinweise auf verschiedene Odometry-Versionen; keine universelle Unterstützung behaupten.
 - Keine Qualitätsverbesserung oder korrekte automatische Registrierung garantiert; Position, Achsen, Tiefenskala, Schärfe und metrische Maße mit realen Aufnahmen und Referenzmaßen prüfen.
@@ -71,6 +71,22 @@ Bei unterschiedlichen RGB-/Tiefenauflösungen bricht die Software standardmäßi
 
 Für jeden verarbeiteten Frame enthält der Bericht zusätzlich Prozentwerte für Distanzen bis 1, 2, 3, 4 und 5 Meter; Nenner sind sämtliche Tiefenpixel des jeweiligen Frames. Ein positiver numerischer Messwert ist nicht zwingend zuverlässig.
 
-## Untersuchter TSDF-Weg – noch nicht freigegeben
+## Untersuchter Open3D-TSDF-Weg – nicht freigegeben
 
 Die volumetrische TSDF-Integration mit Open3D 0.20.0 wurde an einer künstlichen Ebene mit bekanntem Abstand und am synthetischen Wurld-Beispiel ausprobiert. In der aktuellen Testumgebung wurde trotz gültiger Eingabewerte keine Oberfläche erzeugt. Die Ursache ist bisher ungeklärt. Deshalb wurde diese Funktion nicht in den ausführbaren Backend-Weg aufgenommen; eine erfolgreiche Rekonstruktion wäre derzeit nicht seriös zugesichert. Für den weiteren Ausbau sind reproduzierbare Minimaltests, Ursachenanalyse, geometrische Ground-Truth-Messungen und reale iPhone-Datensätze nötig.
+
+## Experimentelle regionale CPU-TSDF-Fusion
+
+Optional `--regional-tsdf` hinzufügen, beispielsweise:
+
+```bash
+.venv/bin/python lidarmonk_backend.py /pfad/stray /pfad/aufnahme.wurld.webm --output /pfad/ausgabe --voxel 0.08 --regional-tsdf
+```
+
+Die Implementierung nutzt eine eigene projektive TSDF-Integration mit NumPy und Marching Cubes aus scikit-image; Open3Ds fehlschlagende TSDF-Volumenfunktion wird nicht verwendet. Beide Aufnahmen werden nach der Registrierung separat auf demselben Raster integriert. Ein Router untersucht Blöcke von 4³ Voxeln: Bereiche, die nur ein Scan sieht, stammen von diesem Scan; bei übereinstimmenden gemeinsamen Messungen werden die TSDF-Werte anhand der Beobachtungszahl gemittelt; bei deutlichem Widerspruch wird das Voxel ausgeschlossen. Die im Bericht und der NPZ-Karte ausgewiesene bevorzugte Quelle basiert auf der regionalen Beobachtungszahl. Sie ist **keine tatsächliche Messgenauigkeit oder Sensor-Confidence** und verursacht derzeit keine automatische Auswahl eines feinen Detail-Meshes.
+
+- Ergebnis: `regional-tsdf-mesh.ply` und `regional-tsdf-map.npz` (Rasterursprung, Voxelgröße, Unterstützung, Quelle und Konflikte). Für die Kartenwerte bedeutet 0: keine Daten, 1: bevorzugt A, 2: bevorzugt B, 3: Konflikt. Bei konsistenten Messungen beider Quellen wird gemittelt, auch wenn 1 oder 2 die regionale Präferenz kennzeichnet.
+- Es werden nur Flächen behalten, deren Nachbarvoxel Messungen besitzen. Das reduziert künstliche Abschlüsse an unbekannten Bereichen, kann aber Löcher vergrößern.
+- Das dichte CPU-Raster ist auf drei Millionen Voxel begrenzt. Voxelzahl wächst ungefähr kubisch mit der Auflösung; größere `--voxel`-Werte verwenden, um das Limit einzuhalten. RGB, Confidence, View-Angle- und Oberflächenrauschen sowie globale Pose-Graph-Optimierung sind noch nicht integriert. Es gibt keine automatische Objektfreistellung.
+- `--regional-tsdf` wurde mit einer synthetischen RGB-D-Ebene bekannter Tiefe und synthetischem Wurld-Demomaterial getestet, nicht mit echten iPhone-Daten. Die ursprüngliche Open3D-TSDF-Ursache bleibt offen; ein vergleichbarer Fehlerbericht existiert unter https://github.com/isl-org/Open3D/issues/7592 .
+- Originalscans sind getrennte Koordinatensysteme. Eine falsche Registrierung bleibt selbst bei geringer Punktwolkenabweichung möglich; bei gleichem Objekt real mit Referenzmaßen prüfen.
