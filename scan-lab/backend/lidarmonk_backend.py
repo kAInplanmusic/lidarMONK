@@ -31,7 +31,7 @@ def prepare(path, tmp):
     if not path.name.lower().endswith(('.webm','.mkv')): raise ValueError('Wurld-Datei (.webm/.mkv) oder entpackten Stray-Ordner angeben.')
     return path,'wurld'
 
-def get_frames(path, max_frames, stride, depth_max, pixel_step):
+def get_frames(path, max_frames, stride, depth_max, pixel_step, aligned_depth=False):
     import wurld as wl
     seq=wl.read(str(path)); n=len(seq.frames)
     if n==0: raise ValueError('Keine Kameraposen/Frames gefunden; Datei ist kein auswertbarer Wurld-Datensatz.')
@@ -47,13 +47,15 @@ def get_frames(path, max_frames, stride, depth_max, pixel_step):
             except TypeError: K=np.asarray(seq.K(camera_id),dtype=float)
         except Exception as e: raise ValueError(f'Frame {i}: Tiefe, Pose oder Kalibrierung nicht lesbar: {e}') from e
         if depth.ndim!=2 or pose.shape!=(4,4) or K.shape!=(3,3) or not np.all(np.isfinite(pose)) or not np.all(np.isfinite(K)) or K[0,0]<=0 or K[1,1]<=0: raise ValueError(f'Frame {i}: ungültige Kalibrierung/Pose/Tiefenformat')
-        good=np.isfinite(depth)&(depth>0)&(depth<=depth_max); stats.append({'frame':i,'pixels':int(depth.size),'valid_within_range':int(good.sum()),'percent_within_range':round(100*float(good.sum())/depth.size,2)})
+        good=np.isfinite(depth)&(depth>0)&(depth<=depth_max); ranges={str(r):round(100*float((np.isfinite(depth)&(depth>0)&(depth<=r)).sum())/depth.size,2) for r in (1,2,3,4,5)}; stats.append({'frame':i,'pixels':int(depth.size),'valid_within_range':int(good.sum()),'percent_within_range':round(100*float(good.sum())/depth.size,2),'percent_at_distances_m':ranges})
         yy,xx=np.mgrid[0:depth.shape[0]:pixel_step,0:depth.shape[1]:pixel_step]; z=depth[::pixel_step,::pixel_step]; mask=np.isfinite(z)&(z>0)&(z<=depth_max); x=xx[mask]; y=yy[mask]; z=z[mask]
         # Depth and K must be at the same resolution; do not infer scaling silently.
         camera=seq.cameras[camera_id]
         if getattr(camera,'model','PINHOLE') not in ('PINHOLE','SIMPLE_PINHOLE'): raise ValueError(f'Frame {i}: Kameramodell {camera.model} wird noch nicht entzerrt; Verarbeitung abgebrochen.')
         cw=int(getattr(camera,'width',depth.shape[1])); ch=int(getattr(camera,'height',depth.shape[0]))
-        if (cw,ch)!=(depth.shape[1],depth.shape[0]): raise ValueError(f'Frame {i}: Kameraauflösung {cw}x{ch} != Tiefenauflösung {depth.shape[1]}x{depth.shape[0]}; sichere Kalibrierung erforderlich.')
+        if (cw,ch)!=(depth.shape[1],depth.shape[0]):
+            if not aligned_depth: raise ValueError(f'Frame {i}: Kameraauflösung {cw}x{ch} != Tiefenauflösung {depth.shape[1]}x{depth.shape[0]}; nur bei nachgewiesen gleichem Bildausschnitt --aligned-depth verwenden.')
+            K=K.copy(); K[0,:]*=depth.shape[1]/cw; K[1,:]*=depth.shape[0]/ch
         pts=np.column_stack(((x-K[0,2])*z/K[0,0],(y-K[1,2])*z/K[1,1],z,np.ones(len(z))))
         pts=(pose@pts.T).T[:,:3]; output.append(pts)
     if not output or not sum(map(len,output)): raise ValueError('Keine gültigen Tiefenpunkte in ausgewählten Frames.')
@@ -71,7 +73,9 @@ def register(a,b,voxel):
     result=reg.registration_icp(b,a,voxel*1.5,coarse.transformation,reg.TransformationEstimationPointToPlane())
     m=np.asarray(result.transformation)
     if not np.isfinite(m).all() or result.fitness<.15: raise ValueError(f'Registrierung unsicher (Überlappung {result.fitness:.3f}); mehr gemeinsame Ansichten oder explizite Transformationsmatrix verwenden.')
-    return m,{'fitness':float(result.fitness),'inlier_rmse_m':float(result.inlier_rmse),'threshold_m':voxel*1.5,'warning':'Fitness ist kein Beweis korrekter Ausrichtung; Symmetrien können falsche Übereinstimmungen erzeugen.'}
+    reverse=reg.evaluate_registration(a,b,voxel*1.5,np.linalg.inv(m))
+    if reverse.fitness<.15: raise ValueError(f'Registrierung asymmetrisch oder unzureichend (Rückrichtung {reverse.fitness:.3f}); Ausrichtung prüfen.')
+    return m,{'reverse_fitness':float(reverse.fitness),'fitness':float(result.fitness),'inlier_rmse_m':float(result.inlier_rmse),'threshold_m':voxel*1.5,'warning':'Fitness ist kein Beweis korrekter Ausrichtung; Symmetrien können falsche Übereinstimmungen erzeugen.'}
 
 def validate_transform(path):
     m=np.asarray(json.loads(Path(path).read_text()),dtype=float)
@@ -94,12 +98,13 @@ def fusion(frames_a,frames_b,m,method,voxel):
         return result
     raise ValueError('Unbekannte Methode')
 
+
 def write_cloud(path,p):
     if not o3d().io.write_point_cloud(str(path),p,write_ascii=False): raise RuntimeError(f'PLY konnte nicht geschrieben werden: {path}')
 
 def main():
     p=argparse.ArgumentParser(description='lidarMONK: zwei RGB-D-Aufnahmen aus Stray/Wurld vergleichen und fusionieren')
-    p.add_argument('capture_a');p.add_argument('capture_b');p.add_argument('--output',required=True);p.add_argument('--voxel',type=float,default=.02);p.add_argument('--max-depth',type=float,default=5);p.add_argument('--stride',type=int,default=10);p.add_argument('--max-frames',type=int,default=30);p.add_argument('--pixel-step',type=int,default=4);p.add_argument('--transform',help='JSON 4x4 starre Matrix von B nach A; ohne Angabe automatische Registrierung');p.add_argument('--mesh',action='store_true',help='optionales Poisson-Mesh: experimentell, kann Oberflächen erfinden')
+    p.add_argument('--aligned-depth',action='store_true',help='Kamera- und Tiefenbild haben dasselbe Sichtfeld; Intrinsik auf Tiefenauflösung skalieren');p.add_argument('capture_a');p.add_argument('capture_b');p.add_argument('--output',required=True);p.add_argument('--voxel',type=float,default=.02);p.add_argument('--max-depth',type=float,default=5);p.add_argument('--stride',type=int,default=10);p.add_argument('--max-frames',type=int,default=30);p.add_argument('--pixel-step',type=int,default=4);p.add_argument('--transform',help='JSON 4x4 starre Matrix von B nach A; ohne Angabe automatische Registrierung');p.add_argument('--mesh',action='store_true',help='optionales Poisson-Mesh: experimentell, kann Oberflächen erfinden')
     a=p.parse_args()
     if a.voxel<=0 or a.max_depth<=0 or a.stride<1 or a.max_frames<1 or a.pixel_step<1: p.error('Parameter müssen positiv sein')
     output=Path(a.output)
@@ -108,7 +113,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='lidarmonk-') as temp:
         ta=Path(temp)/'a';tb=Path(temp)/'b';ta.mkdir();tb.mkdir()
         fa,ka=prepare(a.capture_a,ta);fb,kb=prepare(a.capture_b,tb)
-        A,sa=get_frames(fa,a.max_frames,a.stride,a.max_depth,a.pixel_step);B,sb=get_frames(fb,a.max_frames,a.stride,a.max_depth,a.pixel_step)
+        A,sa=get_frames(fa,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth);B,sb=get_frames(fb,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth)
         ca=cloud(np.concatenate(A)).voxel_down_sample(a.voxel);cb=cloud(np.concatenate(B)).voxel_down_sample(a.voxel)
         if a.transform: m=validate_transform(a.transform); registration={'method':'user_matrix','warning':'Benutzertransformation nicht automatisch validiert'}
         else: m,registration=register(ca,cb,a.voxel);registration['method']='FPFH RANSAC + point-to-plane ICP'
@@ -117,6 +122,7 @@ def main():
         for mode in ('separate','joint','incremental'):
             start=time.perf_counter();result=fusion(A,B,m,mode,a.voxel);write_cloud(output/f'{mode}.ply',result)
             report['strategies'][mode]={'points':len(result.points),'seconds':round(time.perf_counter()-start,3)}
+        if a.aligned_depth: report['warnings'].append('Intrinsik skaliert unter der vom Nutzer bestätigten Annahme eines gemeinsamen Bildausschnitts.')
         if a.mesh:
             result.estimate_normals(o3d().geometry.KDTreeSearchParamHybrid(radius=a.voxel*3,max_nn=30));result.orient_normals_consistent_tangent_plane(15)
             mesh,densities=o3d().geometry.TriangleMesh.create_from_point_cloud_poisson(result,depth=8)
