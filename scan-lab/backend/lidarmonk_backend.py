@@ -31,7 +31,7 @@ def prepare(path, tmp):
     if not path.name.lower().endswith(('.webm','.mkv')): raise ValueError('Wurld-Datei (.webm/.mkv) oder entpackten Stray-Ordner angeben.')
     return path,'wurld'
 
-def get_frames(path, max_frames, stride, depth_max, pixel_step, aligned_depth=False):
+def get_frames(path, max_frames, stride, depth_max, pixel_step, aligned_depth=False, rgbd_out=None):
     import wurld as wl
     seq=wl.read(str(path)); n=len(seq.frames)
     if n==0: raise ValueError('Keine Kameraposen/Frames gefunden; Datei ist kein auswertbarer Wurld-Datensatz.')
@@ -56,6 +56,7 @@ def get_frames(path, max_frames, stride, depth_max, pixel_step, aligned_depth=Fa
         if (cw,ch)!=(depth.shape[1],depth.shape[0]):
             if not aligned_depth: raise ValueError(f'Frame {i}: Kameraauflösung {cw}x{ch} != Tiefenauflösung {depth.shape[1]}x{depth.shape[0]}; nur bei nachgewiesen gleichem Bildausschnitt --aligned-depth verwenden.')
             K=K.copy(); K[0,:]*=depth.shape[1]/cw; K[1,:]*=depth.shape[0]/ch
+        if rgbd_out is not None: rgbd_out.append((depth.astype(np.float32),K.copy(),pose.copy()))
         pts=np.column_stack(((x-K[0,2])*z/K[0,0],(y-K[1,2])*z/K[1,1],z,np.ones(len(z))))
         pts=(pose@pts.T).T[:,:3]; output.append(pts)
     if not output or not sum(map(len,output)): raise ValueError('Keine gültigen Tiefenpunkte in ausgewählten Frames.')
@@ -104,7 +105,7 @@ def write_cloud(path,p):
 
 def main():
     p=argparse.ArgumentParser(description='lidarMONK: zwei RGB-D-Aufnahmen aus Stray/Wurld vergleichen und fusionieren')
-    p.add_argument('--aligned-depth',action='store_true',help='Kamera- und Tiefenbild haben dasselbe Sichtfeld; Intrinsik auf Tiefenauflösung skalieren');p.add_argument('capture_a');p.add_argument('capture_b');p.add_argument('--output',required=True);p.add_argument('--voxel',type=float,default=.02);p.add_argument('--max-depth',type=float,default=5);p.add_argument('--stride',type=int,default=10);p.add_argument('--max-frames',type=int,default=30);p.add_argument('--pixel-step',type=int,default=4);p.add_argument('--transform',help='JSON 4x4 starre Matrix von B nach A; ohne Angabe automatische Registrierung');p.add_argument('--mesh',action='store_true',help='optionales Poisson-Mesh: experimentell, kann Oberflächen erfinden')
+    p.add_argument('--regional-tsdf',action='store_true',help='Experimentelle CPU-TSDF-Fusion mit regionalem Datenvergleich');p.add_argument('--aligned-depth',action='store_true',help='Kamera- und Tiefenbild haben dasselbe Sichtfeld; Intrinsik auf Tiefenauflösung skalieren');p.add_argument('capture_a');p.add_argument('capture_b');p.add_argument('--output',required=True);p.add_argument('--voxel',type=float,default=.02);p.add_argument('--max-depth',type=float,default=5);p.add_argument('--stride',type=int,default=10);p.add_argument('--max-frames',type=int,default=30);p.add_argument('--pixel-step',type=int,default=4);p.add_argument('--transform',help='JSON 4x4 starre Matrix von B nach A; ohne Angabe automatische Registrierung');p.add_argument('--mesh',action='store_true',help='optionales Poisson-Mesh: experimentell, kann Oberflächen erfinden')
     a=p.parse_args()
     if a.voxel<=0 or a.max_depth<=0 or a.stride<1 or a.max_frames<1 or a.pixel_step<1: p.error('Parameter müssen positiv sein')
     output=Path(a.output)
@@ -113,7 +114,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='lidarmonk-') as temp:
         ta=Path(temp)/'a';tb=Path(temp)/'b';ta.mkdir();tb.mkdir()
         fa,ka=prepare(a.capture_a,ta);fb,kb=prepare(a.capture_b,tb)
-        A,sa=get_frames(fa,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth);B,sb=get_frames(fb,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth)
+        ra=[]; rb=[]
+        A,sa=get_frames(fa,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth,rgbd_out=ra if a.regional_tsdf else None);B,sb=get_frames(fb,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth,rgbd_out=rb if a.regional_tsdf else None)
         ca=cloud(np.concatenate(A)).voxel_down_sample(a.voxel);cb=cloud(np.concatenate(B)).voxel_down_sample(a.voxel)
         if a.transform: m=validate_transform(a.transform); registration={'method':'user_matrix','warning':'Benutzertransformation nicht automatisch validiert'}
         else: m,registration=register(ca,cb,a.voxel);registration['method']='FPFH RANSAC + point-to-plane ICP'
@@ -122,6 +124,20 @@ def main():
         for mode in ('separate','joint','incremental'):
             start=time.perf_counter();result=fusion(A,B,m,mode,a.voxel);write_cloud(output/f'{mode}.ply',result)
             report['strategies'][mode]={'points':len(result.points),'seconds':round(time.perf_counter()-start,3)}
+        if a.regional_tsdf:
+            import regional_tsdf as rt
+            start=time.perf_counter(); allpoints=np.concatenate(A+[transformed(p,m) for p in B]); trunc=a.voxel*4
+            origin=allpoints.min(axis=0)-trunc*2; shape=np.ceil((allpoints.max(axis=0)+trunc*2-origin)/a.voxel).astype(int)
+            if np.any(shape<2): raise ValueError('TSDF-Raster zu klein.')
+            as_,aw=rt.integrate(ra,origin,shape,a.voxel,trunc,a.max_depth)
+            bs,bw=rt.integrate([(d,k,m@pose) for d,k,pose in rb],origin,shape,a.voxel,trunc,a.max_depth)
+            field,support,owner,conflicts=rt.route(as_,aw,bs,bw)
+            vertices,faces,normals=rt.surface(field,support,origin,a.voxel)
+            mesh=o3d().geometry.TriangleMesh();mesh.vertices=o3d().utility.Vector3dVector(vertices);mesh.triangles=o3d().utility.Vector3iVector(faces);mesh.remove_unreferenced_vertices();mesh.compute_vertex_normals()
+            if not o3d().io.write_triangle_mesh(str(output/'regional-tsdf-mesh.ply'),mesh): raise RuntimeError('TSDF-Mesh konnte nicht geschrieben werden')
+            np.savez_compressed(output/'regional-tsdf-map.npz',origin=origin,voxel=a.voxel,owner=owner,conflict=conflicts,support=support)
+            report['strategies']['regional_tsdf']={'vertices':len(mesh.vertices),'triangles':len(mesh.triangles),'seconds':round(time.perf_counter()-start,3),'grid_shape':shape.tolist(),'supported_voxels':int(support.sum()),'conflicting_voxels':int(conflicts.sum()),'selection':'block observation count, equal-weight blend where consistent; neither calibrated quality nor confidence'}
+            report['warnings'].append('Regionaler Router nutzt Beobachtungszahl statt echter Sensor-Confidence; Ergebnisse experimentell.')
         if a.aligned_depth: report['warnings'].append('Intrinsik skaliert unter der vom Nutzer bestätigten Annahme eines gemeinsamen Bildausschnitts.')
         if a.mesh:
             result.estimate_normals(o3d().geometry.KDTreeSearchParamHybrid(radius=a.voxel*3,max_nn=30));result.orient_normals_consistent_tangent_plane(15)
