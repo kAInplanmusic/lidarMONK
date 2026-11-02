@@ -22,6 +22,8 @@ def prepare(path, tmp):
     if path.is_file() and path.suffix.lower()=='.zip':
         raise ValueError('ZIP-Dateien bitte zuerst in einen eigenen Ordner entpacken; automatische Archivverarbeitung ist nicht aktiviert.')
     if path.is_dir():
+        if (path/'points.ply').is_file() and (path/'sparse'/'0').is_dir() and (path/'images').is_dir():
+            return path/'points.ply','splatcapture-points'
         for marker in ('camera_matrix.csv','odometry.csv','depth'):
             if not (path/marker).exists(): raise ValueError(f'Stray-Ordner unvollständig: {marker} fehlt')
         out=Path(tmp)/'capture.wurld.webm'
@@ -105,7 +107,7 @@ def write_cloud(path,p):
 
 def main():
     p=argparse.ArgumentParser(description='lidarMONK: zwei RGB-D-Aufnahmen aus Stray/Wurld vergleichen und fusionieren')
-    p.add_argument('--regional-tsdf',action='store_true',help='Experimentelle CPU-TSDF-Fusion mit regionalem Datenvergleich');p.add_argument('--aligned-depth',action='store_true',help='Kamera- und Tiefenbild haben dasselbe Sichtfeld; Intrinsik auf Tiefenauflösung skalieren');p.add_argument('capture_a');p.add_argument('capture_b');p.add_argument('--output',required=True);p.add_argument('--voxel',type=float,default=.02);p.add_argument('--max-depth',type=float,default=5);p.add_argument('--stride',type=int,default=10);p.add_argument('--max-frames',type=int,default=30);p.add_argument('--pixel-step',type=int,default=4);p.add_argument('--transform',help='JSON 4x4 starre Matrix von B nach A; ohne Angabe automatische Registrierung');p.add_argument('--mesh',action='store_true',help='optionales Poisson-Mesh: experimentell, kann Oberflächen erfinden')
+    p.add_argument('--motion-correction',action='store_true',help='Experimentelle starre Frame-Korrektur; kein nichtstarrer Personen-Tracker');p.add_argument('--capture-c',help='Optional dritte Aufnahme: Stray-Ordner, Wurld-Datei oder SplatCapture-Ordner');p.add_argument('--regional-tsdf',action='store_true',help='Experimentelle CPU-TSDF-Fusion mit regionalem Datenvergleich');p.add_argument('--aligned-depth',action='store_true',help='Kamera- und Tiefenbild haben dasselbe Sichtfeld; Intrinsik auf Tiefenauflösung skalieren');p.add_argument('capture_a');p.add_argument('capture_b');p.add_argument('--output',required=True);p.add_argument('--voxel',type=float,default=.02);p.add_argument('--max-depth',type=float,default=5);p.add_argument('--stride',type=int,default=10);p.add_argument('--max-frames',type=int,default=30);p.add_argument('--pixel-step',type=int,default=4);p.add_argument('--transform',help='JSON 4x4 starre Matrix von B nach A; ohne Angabe automatische Registrierung');p.add_argument('--mesh',action='store_true',help='optionales Poisson-Mesh: experimentell, kann Oberflächen erfinden')
     a=p.parse_args()
     if a.voxel<=0 or a.max_depth<=0 or a.stride<1 or a.max_frames<1 or a.pixel_step<1: p.error('Parameter müssen positiv sein')
     output=Path(a.output)
@@ -115,16 +117,31 @@ def main():
         ta=Path(temp)/'a';tb=Path(temp)/'b';ta.mkdir();tb.mkdir()
         fa,ka=prepare(a.capture_a,ta);fb,kb=prepare(a.capture_b,tb)
         ra=[]; rb=[]
-        A,sa=get_frames(fa,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth,rgbd_out=ra if a.regional_tsdf else None);B,sb=get_frames(fb,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth,rgbd_out=rb if a.regional_tsdf else None)
+        def load(path,kind,raw):
+            if kind=='splatcapture-points':
+                pointcloud=o3d().io.read_point_cloud(str(path)); points=np.asarray(pointcloud.points);points=points[np.isfinite(points).all(axis=1)]
+                if len(points)<30: raise ValueError('SplatCapture points.ply enthält zu wenige Punkte.')
+                return [points],{'frames_total':None,'frames_used':None,'points':len(points),'note':'Nur exportierte ARKit-Punktwolke; keine RGB-D-Frames oder Tiefenkarten importiert.'}
+            return get_frames(path,a.max_frames,a.stride,a.max_depth,a.pixel_step,aligned_depth=a.aligned_depth,rgbd_out=raw if a.regional_tsdf else None)
+        A,sa=load(fa,ka,ra); B,sb=load(fb,kb,rb)
+        motion_report={}
+        if a.motion_correction:
+            import motion
+            A,corrected_ra,motion_report['a']=motion.correct(A,ra if ra else None,a.voxel)
+            B,corrected_rb,motion_report['b']=motion.correct(B,rb if rb else None,a.voxel)
+            if corrected_ra is not None:ra=corrected_ra
+            if corrected_rb is not None:rb=corrected_rb
         ca=cloud(np.concatenate(A)).voxel_down_sample(a.voxel);cb=cloud(np.concatenate(B)).voxel_down_sample(a.voxel)
         if a.transform: m=validate_transform(a.transform); registration={'method':'user_matrix','warning':'Benutzertransformation nicht automatisch validiert'}
         else: m,registration=register(ca,cb,a.voxel);registration['method']='FPFH RANSAC + point-to-plane ICP'
         write_cloud(output/'scan-a.ply',ca);write_cloud(output/'scan-b-local.ply',cb)
-        report={'input_types':[ka,kb],'scan_a':sa,'scan_b':sb,'registration':registration,'transform_b_to_a':m.tolist(),'voxel_m':a.voxel,'strategies':{},'warnings':['Prototyp: keine Gerätevalidierung.','Ein gemeinsames Objekt und starre Szene werden vorausgesetzt.','Punktwolke ist nicht automatisch ein geschlossenes Mesh.','RGB-Farbe und Confidence werden bislang nicht fusioniert.']}
+        report={'input_types':[ka,kb],'scan_a':sa,'scan_b':sb,'registration':registration,'transform_b_to_a':m.tolist(),'motion':motion_report,'voxel_m':a.voxel,'strategies':{},'warnings':['Prototyp: keine Gerätevalidierung.','Ein gemeinsames Objekt und starre Szene werden vorausgesetzt.','Punktwolke ist nicht automatisch ein geschlossenes Mesh.','RGB-Farbe und Confidence werden bislang nicht fusioniert.','Bewegungskorrektur ist starr, keine Körper- oder Gesichtserkennung; Hintergrund kann Ausrichtung dominieren.']}
         for mode in ('separate','joint','incremental'):
             start=time.perf_counter();result=fusion(A,B,m,mode,a.voxel);write_cloud(output/f'{mode}.ply',result)
             report['strategies'][mode]={'points':len(result.points),'seconds':round(time.perf_counter()-start,3)}
-        if a.regional_tsdf:
+        if a.regional_tsdf and (not ra or not rb):
+            report['warnings'].append('Regionale TSDF ausgelassen: mindestens eine Eingabe enthält keine unterstützten RGB-D-Frames (z. B. SplatCapture-Punktwolke).')
+        if a.regional_tsdf and ra and rb:
             import regional_tsdf as rt
             start=time.perf_counter(); allpoints=np.concatenate(A+[transformed(p,m) for p in B]); trunc=a.voxel*4
             origin=allpoints.min(axis=0)-trunc*2; shape=np.ceil((allpoints.max(axis=0)+trunc*2-origin)/a.voxel).astype(int)
@@ -138,6 +155,17 @@ def main():
             np.savez_compressed(output/'regional-tsdf-map.npz',origin=origin,voxel=a.voxel,owner=owner,conflict=conflicts,support=support)
             report['strategies']['regional_tsdf']={'vertices':len(mesh.vertices),'triangles':len(mesh.triangles),'seconds':round(time.perf_counter()-start,3),'grid_shape':shape.tolist(),'supported_voxels':int(support.sum()),'conflicting_voxels':int(conflicts.sum()),'selection':'block observation count, equal-weight blend where consistent; neither calibrated quality nor confidence'}
             report['warnings'].append('Regionaler Router nutzt Beobachtungszahl statt echter Sensor-Confidence; Ergebnisse experimentell.')
+        if a.capture_c:
+            tc=Path(temp)/'c';tc.mkdir();fc,kc=prepare(a.capture_c,tc); C,sc=load(fc,kc,[])
+            if a.motion_correction:
+                C,_,motion_report['c']=motion.correct(C,None,a.voxel)
+            cc=cloud(np.concatenate(C)).voxel_down_sample(a.voxel)
+            m3,r3=register(ca,cc,a.voxel); cc.transform(m3)
+            write_cloud(output/'third-registered.ply',cc)
+            combined=(fusion(A,B,m,'joint',a.voxel)+cc).voxel_down_sample(a.voxel)
+            write_cloud(output/'combined-three.ply',combined)
+            report['third_capture']={'input_type':kc,'scan':sc,'transform_c_to_a':m3.tolist(),'registration':r3,'points_combined':len(combined.points),'note':'Punktwolkenfusion; TSDF-Mesh enthält nur A und B.'}
+            report['warnings'].append('Dritte Aufnahme ist nicht im regionalen TSDF-Mesh enthalten.')
         if a.aligned_depth: report['warnings'].append('Intrinsik skaliert unter der vom Nutzer bestätigten Annahme eines gemeinsamen Bildausschnitts.')
         if a.mesh:
             result.estimate_normals(o3d().geometry.KDTreeSearchParamHybrid(radius=a.voxel*3,max_nn=30));result.orient_normals_consistent_tangent_plane(15)
