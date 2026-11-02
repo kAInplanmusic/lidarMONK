@@ -41,7 +41,7 @@ Ausgaben:
 ## Was noch nicht funktioniert
 
 - RGB-Farben und Confidence-Maskierung werden in der aktuellen Version nicht in die Punktwolken übernommen, obwohl sie in den Quelldaten vorhanden sein können.
-- Kein Webserver/GUI oder Handy-Direktübertragung; Upload ist manuelles Dateikopieren.
+- Die lokale Upload-Oberfläche ermöglicht Handyübertragung im eigenen WLAN; eine native Desktop-GUI, verschlüsselte Verbindung und 3D-Vorschau fehlen.
 - Kein echtes Multi-View-Fotogrammetrie- oder Gaussian-Splatting-Backend. Die drei ursprünglichen Vergleichsstrategien sind Punktwolkenvarianten; die zusätzliche CPU-TSDF-Variante ist experimentell.
 - Nur unterstützte Wurld-Kameramodelle `PINHOLE` und `SIMPLE_PINHOLE` mit Kameraintrinsik auf Tiefenbildauflösung. Andere Modelle oder abweichende Auflösungen werden abgelehnt, anstatt ungeprüft kalibriert zu werden.
 - `wurld` verarbeitet Stray über seinen Konverter. Laut upstream ist die reale Gerätevalidierung der Konventionen noch offen. Es gibt Hinweise auf verschiedene Odometry-Versionen; keine universelle Unterstützung behaupten.
@@ -112,13 +112,13 @@ Der Start gibt den Zugangslink mit Platzhalter `<LINUX-IP>` aus. Die passende lo
 3. Zwei unterschiedliche Aufnahmen und optional eine dritte Aufnahme auswählen und Objekt oder Person angeben. Die regionale TSDF-Option ist zunächst aktiviert; falls sie wegen Konflikten, Speicherlimit oder fehlender Daten fehlschlägt, kann sie deaktiviert und ein neuer Auftrag gestartet werden.
 4. Bei Erfolg stehen PLY-Dateien und der JSON-Bericht zum Download bereit. Aufträge laufen auf dem Linux-Rechner; Smartphone und Linux müssen während der Übertragung erreichbar sein. Ein Unterbrechen des Servers beendet laufende Aufträge. Die Dateien bleiben im lokalen Datenordner `lidarmonk-data`; löschen ist derzeit nur manuell über den Dateimanager möglich. Nach Neustart sind alte Auftragsdownloads nicht automatisch aufgelistet.
 
-**Personenmodus:** führt eine experimentelle starre Frame-zu-Referenz-ICP-Korrektur innerhalb jeder Aufnahme aus. Frames mit geringer Überlappung oder zu großer Verschiebung/Drehung werden verworfen. Es gibt noch keine Personensegmentierung oder nichtstarre Korrektur; Hintergrundbewegung, Atmung und Gelenke sind ungelöst. Das Backend erwartet zwei starre Aufnahmen; eine einzelne Aufnahme kann in dieser Oberfläche noch nicht allein verarbeitet werden. Zustimmung der abgebildeten Person einholen und Daten angemessen schützen.
+**Personenmodus:** kennzeichnet die Aufnahme als Person. Die experimentelle starre Frame-zu-Referenz-ICP-Korrektur kann separat aktiviert werden. Frames mit geringer Überlappung oder zu großer Verschiebung/Drehung werden verworfen. Es gibt noch keine Personensegmentierung oder nichtstarre Korrektur; Hintergrundbewegung, Atmung und Gelenke sind ungelöst. Das Backend erwartet zwei starre Aufnahmen; eine einzelne Aufnahme kann in dieser Oberfläche noch nicht allein verarbeitet werden. Zustimmung der abgebildeten Person einholen und Daten angemessen schützen.
 
-**Praxistest:** End-to-End wurden zwei synthetische Wurld-Dateien über HTTP hochgeladen und verarbeitet; unautorisierter Zugriff und ein ZIP mit Pfadmanipulation wurden abgewiesen. Ein echtes iPhone, eine echte Stray-ZIP und der Safari-Upload wurden hier noch nicht getestet. Die Weboberfläche enthält noch keine 3D-Vorschau, Objektfreistellung oder automatische Motion-Korrektur. Die Farbdaten und Confidence-Masken werden bei der Geometriefusion weiterhin nicht berücksichtigt.
+**Praxistest:** End-to-End wurden zwei synthetische Wurld-Dateien über HTTP hochgeladen und verarbeitet; unautorisierter Zugriff und ein ZIP mit Pfadmanipulation wurden abgewiesen. Ein echtes iPhone, eine echte Stray-ZIP und der Safari-Upload wurden hier noch nicht getestet. Die Weboberfläche enthält noch keine 3D-Vorschau, Objektfreistellung oder nichtstarre Bewegungskorrektur. Die Farbdaten und Confidence-Masken werden bei der Geometriefusion weiterhin nicht berücksichtigt.
 
 ## Experimentelle Bewegungskorrektur und dritte App
 
-Der Personenmodus der Upload-Oberfläche aktiviert `--motion-correction`; auf der Kommandozeile kann der Schalter unabhängig vom Motiv gesetzt werden. Die Korrektur gleicht jeden Frame einer Aufnahme mittels Punkt-zu-Punkt-ICP an deren ersten akzeptierten Referenzframe an. Sie lässt standardmäßig höchstens 10 cm Translation und 12° Rotation zu und verwirft Frames bei zu geringer Überlappung oder Überschreitung dieser Grenzen. Berichte enthalten je Frame Status und Transformationsmetriken. Die Transformation wird bei RGB-D-Tiefenframes auch auf deren Kamerapose für TSDF übertragen.
+Die experimentelle Bewegungskorrektur wird in der Upload-Oberfläche ausdrücklich per Checkbox aktiviert; auf der Kommandozeile kann der Schalter `--motion-correction` unabhängig vom Motiv gesetzt werden. Sie ist standardmäßig ausgeschaltet, damit ein Rundgang nicht ohne ausdrückliche Auswahl viele Aufnahmen verliert. Die Korrektur gleicht jeden Frame einer Aufnahme mittels Punkt-zu-Punkt-ICP an deren ersten akzeptierten Referenzframe an. Sie lässt standardmäßig höchstens 10 cm Translation und 12° Rotation zu und verwirft Frames bei zu geringer Überlappung oder Überschreitung dieser Grenzen. Berichte enthalten je Frame Status und Transformationsmetriken. Die Transformation wird bei RGB-D-Tiefenframes auch auf deren Kamerapose für TSDF übertragen.
 
 **Grenzen:** Der Algorithmus ist keine Segmentierung, keine Körper- oder Gesichtsverfolgung und keine nichtstarre Bewegungskorrektur. Hintergrund kann dominieren, Selbstverdeckungen und große Aufnahmewinkel können Frames ablehnen, und starre Korrekturen können an einzelnen Körperteilen falsch sein. Verwerfungen und Ergebnisse müssen visuell geprüft werden. Es existiert kein direkter Bewegungskorrektur-Nachweis an echten Personenaufnahmen.
 
@@ -131,3 +131,7 @@ Die optionale dritte Aufnahme wird global auf Scan A registriert und als `third-
 ```
 
 Für SplatCapture wurden nur künstliche Ordner-/Punktwolkenbeispiele getestet, keine App-Exportdatei. Nichtkommerzielle Drittanbieter-Lizenzen und Nutzungsbedingungen sind vor Übernahme von Drittcode zu beachten; die Integration hier verwendet die dokumentierten Dateiformate und kopiert keinen SplatCapture-Quellcode.
+
+## Frameauswahl
+
+Wenn mehr Frames als `--max-frames` nach dem eingestellten `--stride` verfügbar sind, werden die Kandidaten gleichmäßig über die gesamte Aufnahme verteilt gewählt. Bisher wurden nur die ersten Frames gewählt, wodurch die Rückseite eines Rundgangs fehlen konnte. Die Auswahl verbessert die Abdeckung nicht garantiert und kann wichtige kurze Ansichten weiterhin übersehen.
