@@ -90,3 +90,44 @@ Die Implementierung nutzt eine eigene projektive TSDF-Integration mit NumPy und 
 - Das dichte CPU-Raster ist auf drei Millionen Voxel begrenzt. Voxelzahl wächst ungefähr kubisch mit der Auflösung; größere `--voxel`-Werte verwenden, um das Limit einzuhalten. RGB, Confidence, View-Angle- und Oberflächenrauschen sowie globale Pose-Graph-Optimierung sind noch nicht integriert. Es gibt keine automatische Objektfreistellung.
 - `--regional-tsdf` wurde mit einer synthetischen RGB-D-Ebene bekannter Tiefe und synthetischem Wurld-Demomaterial getestet, nicht mit echten iPhone-Daten. Die ursprüngliche Open3D-TSDF-Ursache bleibt offen; ein vergleichbarer Fehlerbericht existiert unter https://github.com/isl-org/Open3D/issues/7592 .
 - Originalscans sind getrennte Koordinatensysteme. Eine falsche Registrierung bleibt selbst bei geringer Punktwolkenabweichung möglich; bei gleichem Objekt real mit Referenzmaßen prüfen.
+
+## Upload-Oberfläche für erste Aufnahmen
+
+Auf Linux mit installierten Abhängigkeiten im `scan-lab/backend`-Ordner starten:
+
+```bash
+.venv/bin/python server.py
+```
+
+Den ausgegebenen vollständigen Link am Linux-Rechner öffnen. Für das iPhone im **vertrauenswürdigen selben WLAN**:
+
+```bash
+.venv/bin/python server.py --lan
+```
+
+Der Start gibt den Zugangslink mit Platzhalter `<LINUX-IP>` aus. Die passende lokale IP des Linux-Rechners kann mit `hostname -I` ermittelt werden. Den vollständigen Link einschließlich Schlüssel auf dem iPhone in Safari eingeben. `--lan` ist ausdrücklich optional: Die Verbindung ist HTTP und nicht verschlüsselt; nicht in öffentlichen/fremden Netzen oder per Portfreigabe verwenden. Der Zugangsschlüssel wird bei jedem Neustart neu erzeugt und darf nicht weitergegeben werden. HTTPS, Benutzerkonten und eine verschlüsselte Übertragung sind noch nicht implementiert.
+
+1. In Stray Scanner den vollständigen Aufnahmeordner über Dateien als ZIP komprimieren; alternativ WurldCam-Datei in Dateien sichern. Originale bleiben auf dem iPhone.
+2. Im Browser zwei ZIP-/Wurld-WebM-Dateien auswählen und hochladen (maximal 2 GiB je Datei; entpackte ZIP maximal 4 GiB und 20.000 Dateien). Entpackte Stray-/SplatCapture-ZIPs müssen genau einen vollständigen Aufnahmeordner enthalten. ZIPs mit Dateipfaden außerhalb des Zielordners oder Symlinks werden abgelehnt.
+3. Zwei unterschiedliche Aufnahmen und optional eine dritte Aufnahme auswählen und Objekt oder Person angeben. Die regionale TSDF-Option ist zunächst aktiviert; falls sie wegen Konflikten, Speicherlimit oder fehlender Daten fehlschlägt, kann sie deaktiviert und ein neuer Auftrag gestartet werden.
+4. Bei Erfolg stehen PLY-Dateien und der JSON-Bericht zum Download bereit. Aufträge laufen auf dem Linux-Rechner; Smartphone und Linux müssen während der Übertragung erreichbar sein. Ein Unterbrechen des Servers beendet laufende Aufträge. Die Dateien bleiben im lokalen Datenordner `lidarmonk-data`; löschen ist derzeit nur manuell über den Dateimanager möglich. Nach Neustart sind alte Auftragsdownloads nicht automatisch aufgelistet.
+
+**Personenmodus:** führt eine experimentelle starre Frame-zu-Referenz-ICP-Korrektur innerhalb jeder Aufnahme aus. Frames mit geringer Überlappung oder zu großer Verschiebung/Drehung werden verworfen. Es gibt noch keine Personensegmentierung oder nichtstarre Korrektur; Hintergrundbewegung, Atmung und Gelenke sind ungelöst. Das Backend erwartet zwei starre Aufnahmen; eine einzelne Aufnahme kann in dieser Oberfläche noch nicht allein verarbeitet werden. Zustimmung der abgebildeten Person einholen und Daten angemessen schützen.
+
+**Praxistest:** End-to-End wurden zwei synthetische Wurld-Dateien über HTTP hochgeladen und verarbeitet; unautorisierter Zugriff und ein ZIP mit Pfadmanipulation wurden abgewiesen. Ein echtes iPhone, eine echte Stray-ZIP und der Safari-Upload wurden hier noch nicht getestet. Die Weboberfläche enthält noch keine 3D-Vorschau, Objektfreistellung oder automatische Motion-Korrektur. Die Farbdaten und Confidence-Masken werden bei der Geometriefusion weiterhin nicht berücksichtigt.
+
+## Experimentelle Bewegungskorrektur und dritte App
+
+Der Personenmodus der Upload-Oberfläche aktiviert `--motion-correction`; auf der Kommandozeile kann der Schalter unabhängig vom Motiv gesetzt werden. Die Korrektur gleicht jeden Frame einer Aufnahme mittels Punkt-zu-Punkt-ICP an deren ersten akzeptierten Referenzframe an. Sie lässt standardmäßig höchstens 10 cm Translation und 12° Rotation zu und verwirft Frames bei zu geringer Überlappung oder Überschreitung dieser Grenzen. Berichte enthalten je Frame Status und Transformationsmetriken. Die Transformation wird bei RGB-D-Tiefenframes auch auf deren Kamerapose für TSDF übertragen.
+
+**Grenzen:** Der Algorithmus ist keine Segmentierung, keine Körper- oder Gesichtsverfolgung und keine nichtstarre Bewegungskorrektur. Hintergrund kann dominieren, Selbstverdeckungen und große Aufnahmewinkel können Frames ablehnen, und starre Korrekturen können an einzelnen Körperteilen falsch sein. Verwerfungen und Ergebnisse müssen visuell geprüft werden. Es existiert kein direkter Bewegungskorrektur-Nachweis an echten Personenaufnahmen.
+
+SplatCapture Studio (TestFlight; https://github.com/KuoFengYuan/splatify-anything) exportiert laut https://github.com/KuoFengYuan/splatify-anything/blob/main/docs/HISTORY_TRAINING_EXPORT.md eine COLMAP-Trainings-ZIP mit `images/`, `sparse/0/` und `points.ply`. Der Upload akzeptiert diese Ordnerstruktur als ZIP; das Backend verwendet derzeit **nur `points.ply` im ARKit-Weltkoordinatensystem**. Bilder, Posen, rohe Tiefen und Confidence dieser App werden noch nicht verarbeitet. COLMAP-Koordinaten und ARKit-Punktwolke dürfen nicht ohne Transformation vermischt werden.
+
+Die optionale dritte Aufnahme wird global auf Scan A registriert und als `third-registered.ply` sowie gemeinsam mit A/B als `combined-three.ply` ausgegeben. Das regionale TSDF-Mesh verarbeitet weiterhin nur die RGB-D-Frames von A und B; die dritte Punktwolke ergänzt dieses Mesh nicht. Wird SplatCapture als A oder B verwendet, wird die regionale TSDF-Fusion übersprungen, weil für diese Quelle nur eine Punktwolke geladen wird. Empty-Cloud-Exporte werden abgewiesen. Beispiel:
+
+```bash
+.venv/bin/python lidarmonk_backend.py /pfad/stray /pfad/wurld.webm --capture-c /pfad/splat-entpackt --motion-correction --output /pfad/ausgabe
+```
+
+Für SplatCapture wurden nur künstliche Ordner-/Punktwolkenbeispiele getestet, keine App-Exportdatei. Nichtkommerzielle Drittanbieter-Lizenzen und Nutzungsbedingungen sind vor Übernahme von Drittcode zu beachten; die Integration hier verwendet die dokumentierten Dateiformate und kopiert keinen SplatCapture-Quellcode.
