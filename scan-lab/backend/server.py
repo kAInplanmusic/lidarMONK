@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Local-first upload + jobs for lidarMONK; explicit LAN opt-in."""
-import argparse, html, json, os, secrets, shutil, socket, subprocess, sys, threading, time, uuid, zipfile
+import argparse, html, ipaddress, json, os, secrets, shutil, socket, subprocess, sys, threading, time, uuid, zipfile
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit, parse_qs
@@ -123,6 +123,20 @@ def unzip_checked_existing(dest):
     if len(matches)!=1:raise ValueError('Stray-Ordner nicht eindeutig.')
     return matches[0]
 
+def lan_ipv4():
+    """List candidate interface addresses; multiple interfaces may require a choice."""
+    try:
+        result=subprocess.run(['hostname','-I'],capture_output=True,text=True,check=True,timeout=3)
+    except (OSError,subprocess.SubprocessError):
+        return []
+    addresses=[]
+    for value in result.stdout.split():
+        try: address=ipaddress.IPv4Address(value)
+        except ipaddress.AddressValueError: continue
+        if not (address.is_loopback or address.is_link_local or address.is_unspecified or address.is_multicast) and str(address) not in addresses:
+            addresses.append(str(address))
+    return addresses
+
 def main():
     global ROOT, TOKEN
     p=argparse.ArgumentParser();p.add_argument('--data',default='lidarmonk-data');p.add_argument('--port',type=int,default=8765);p.add_argument('--lan',action='store_true',help='Im lokalen Netz über HTTP erreichbar machen; nur vertrauenswürdiges WLAN');p.add_argument('--cloud',action='store_true',help='Hosting hinter HTTPS: Zugriffsschlüssel aus LIDARMONK_ACCESS_TOKEN')
@@ -135,7 +149,13 @@ def main():
     if a.cloud: print('Cloud-Modus gestartet; Schlüssel wird nicht protokolliert.',flush=True)
     else: print('Lokal: http://127.0.0.1:'+str(port)+'/#'+TOKEN,flush=True)
     if a.lan and not a.cloud:
-        print('LAN aktiv: HTTP ist unverschlüsselt! Am iPhone http://<LINUX-IP>:'+str(port)+'/#'+TOKEN+' öffnen.',flush=True)
+        print('LAN aktiv: HTTP ist unverschlüsselt. Nur im vertrauenswürdigen Heimnetz verwenden.',flush=True)
+        addresses=lan_ipv4()
+        if addresses:
+            print('Am iPhone im selben WLAN öffnen (bei mehreren Adressen die WLAN-Adresse wählen):',flush=True)
+            for address in addresses: print('  http://'+address+':'+str(port)+'/#'+TOKEN,flush=True)
+        else:
+            print('Keine LAN-Adresse automatisch gefunden. Rechner-IP mit hostname -I prüfen und http://<LINUX-IP>:'+str(port)+'/#'+TOKEN+' öffnen.',flush=True)
     try:server.serve_forever()
     except KeyboardInterrupt:pass
     finally:server.server_close()
