@@ -1,0 +1,30 @@
+Ja, das iPhone 18 Pro (sowie das iPhone 18 Pro Max) verfügt über einen integrierten LiDAR-Scanner. Er ist, wie bei allen Pro-Modellen seit dem iPhone 12 Pro, fest im Kameramodul auf der Rückseite verbaut. Dieser Sensor ist speziell für die Tiefenmessung und 3D-Erfassung konzipiert und ermöglicht die Nutzung professioneller 3D-Scan-Apps direkt ab Werk.
+
+Hier sind die detaillierten technischen Daten und die Eignung für 3D-Scans und CAD:
+
+🔍 Technische Details des LiDAR-Sensors
+
+· Verwendeter Sensor: Apple setzt beim iPhone 18 Pro laut übereinstimmenden Berichten weiterhin auf den Sony IMX591. Dies ist ein speziell für LiDAR-Anwendungen entwickelter Sensor, der auf einer 3D-Stacked-Backside-Illuminated (BSI)-Architektur basiert.
+· Funktionsprinzip: Es handelt sich um einen direkten Time-of-Flight (ToF)-Sensor. Er sendet unsichtbare Laserpulse aus und misst die Zeit, die das reflektierte Licht benötigt, um zum Sensor zurückzukehren. Aus dieser Laufzeit wird die Entfernung berechnet. Die Technologie nutzt einen VCSEL-Laser (Vertical-Cavity Surface-Emitting Laser) als Sender und einen SPAD-Empfänger (Single-Photon Avalanche Diode).
+· Reichweite: Die maximale, nutzbare Distanz für die 3D-Erfassung liegt bei etwa 5 Metern. Für größere Objekte oder Räume ist der Sensor daher nur bedingt geeignet.
+· Genauigkeit und Punktdichte:
+  · Die Genauigkeit wird in der Fachliteratur für den LiDAR-Sensor typischerweise mit etwa 5 mm pro Messpunkt angegeben, abhängig von der Entfernung. In der Praxis erreichen kombinierte Scans (LiDAR + Fotogrammetrie) oft eine Genauigkeit im niedrigen Millimeterbereich.
+  · Die Punktdichte nimmt mit der Entfernung stark ab. Eine Studie zum Vorgängermodell (iPhone 12 Pro) zeigte eine Dichte von ca. 7.225 Punkten pro Quadratmeter bei 25 cm Abstand, die auf etwa 150 Punkte pro Quadratmeter bei 250 cm fällt. Der Sensor erzeugt pro Scan etwa 576 Messpunkte.
+
+🎯 Eignung für 3D-Scans und CAD
+
+Der LiDAR des iPhone 18 Pro ist ein leistungsfähiges Werkzeug für die schnelle 3D-Erfassung, stößt bei CAD-Anforderungen jedoch an prinzipbedingte Grenzen.
+
+· Gut geeignet für:
+  · Schnelle Raum- und Umgebungserfassung: Ideal für die Dokumentation von Räumen, Baustellen oder Tatorten und die Erstellung von Grundrissen (z. B. mit Apple RoomPlan).
+  · Visualisierung und AR: Perfekt für die Erstellung von 3D-Modellen für AR-Anwendungen, Produktpräsentationen oder Spiele.
+  · Grobe Messungen und Schätzungen: Nützlich für schnelle Größenabschätzungen von Objekten oder Entfernungen im Alltag.
+· Weniger geeignet für (Grenzen):
+  · Hochpräzise CAD-Modellierung und Reverse Engineering: Für Anwendungen, die exakte Maße und geometrische Details (z. B. für die Fertigung) erfordern, ist die Genauigkeit nicht ausreichend. Professionelle Scanner erreichen Genauigkeiten von 0,02–0,05 mm, was den LiDAR des iPhones um ein Vielfaches übersteigt.
+  · Detailgetreue Erfassung kleiner Objekte: Feine Strukturen wie Gewinde, scharfe Kanten oder kleine Vertiefungen werden oft nicht präzise genug aufgelöst.
+  · Schwierige Oberflächen: Dunkle, stark glänzende oder transparente Materialien (z. B. schwarzer Kunststoff, Glas, poliertes Metall) können den Infrarot-Laser stören und zu fehlerhaften oder unvollständigen Scans führen.
+  · Große Objekte: Aufgrund der begrenzten Reichweite von ca. 5 Metern sind ganze Gebäude oder große Gelände nicht in einem Durchgang erfassbar. Zudem kann die Nachverfolgung (Tracking) über größere Distanzen ungenau werden.
+
+Zusammenfassend bietet der LiDAR-Sensor des iPhone 18 Pro eine beeindruckende und extrem praktische Möglichkeit, die reale Welt schnell in 3D-Daten zu erfassen. Für viele Anwendungen in den Bereichen Visualisierung, Dokumentation und AR ist er ein valides Werkzeug. Für Aufgaben, die eine metrologische Präzision im CAD-Bereich erfordern, sind jedoch nach wie vor spezialisierte 3D-Scanner notwendig.
+
+Ich hoffe, diese detaillierte Aufschlüsselung hilft dir bei der Einschätzung, ob das iPhone 18 Pro für deine spezifischen 3D-Scan- oder CAD-Projekte geeignet ist.
