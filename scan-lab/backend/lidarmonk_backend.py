@@ -33,11 +33,19 @@ def prepare(path, tmp):
     if not path.name.lower().endswith(('.webm','.mkv')): raise ValueError('Wurld-Datei (.webm/.mkv) oder entpackten Stray-Ordner angeben.')
     return path,'wurld'
 
+def select_frames(n, stride, max_frames):
+    """Sample candidates across the complete capture instead of only its beginning."""
+    candidates=list(range(0,n,stride))
+    if len(candidates)<=max_frames: return candidates
+    if max_frames==1: return [candidates[0]]
+    indices=np.linspace(0,len(candidates)-1,max_frames,dtype=int)
+    return [candidates[i] for i in indices]
+
 def get_frames(path, max_frames, stride, depth_max, pixel_step, aligned_depth=False, rgbd_out=None):
     import wurld as wl
     seq=wl.read(str(path)); n=len(seq.frames)
     if n==0: raise ValueError('Keine Kameraposen/Frames gefunden; Datei ist kein auswertbarer Wurld-Datensatz.')
-    selected=list(range(0,n,stride))[:max_frames]; output=[]; stats=[]
+    selected=select_frames(n,stride,max_frames); output=[]; stats=[]
     for i in selected:
         frame=seq.frames[i]
         if hasattr(frame,'pose_valid') and not frame.pose_valid: continue
@@ -62,7 +70,7 @@ def get_frames(path, max_frames, stride, depth_max, pixel_step, aligned_depth=Fa
         pts=np.column_stack(((x-K[0,2])*z/K[0,0],(y-K[1,2])*z/K[1,1],z,np.ones(len(z))))
         pts=(pose@pts.T).T[:,:3]; output.append(pts)
     if not output or not sum(map(len,output)): raise ValueError('Keine gültigen Tiefenpunkte in ausgewählten Frames.')
-    return output,{'frames_total':n,'frames_used':len(output),'depth_limit_m':depth_max,'frames':stats,'color':'nicht implementiert','confidence_filter':'nicht implementiert'}
+    return output,{'frames_total':n,'frames_used':len(output),'selected_frame_indices':selected,'depth_limit_m':depth_max,'frames':stats,'color':'nicht implementiert','confidence_filter':'nicht implementiert'}
 
 def register(a,b,voxel):
     lib=o3d(); a=a.voxel_down_sample(voxel); b=b.voxel_down_sample(voxel)
