@@ -18,3 +18,20 @@ class ServerTest(unittest.TestCase):
     req=urllib.request.Request(base+'/captures',headers={'X-Lidar-Token':token});self.assertEqual(len(json.load(urllib.request.urlopen(req))['captures']),1)
    finally:p.terminate();p.wait(timeout=5);p.stdout.close();p.stderr.close()
 if __name__=='__main__':unittest.main()
+
+class JobOptionsTest(unittest.TestCase):
+ def test_motion_is_opt_in(self):
+  import importlib.util
+  from unittest.mock import patch
+  spec=importlib.util.spec_from_file_location('local_server',Path(__file__).resolve().parents[1]/'server.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
+  with tempfile.TemporaryDirectory() as t:
+   s.ROOT=Path(t);ids=['a'*32,'b'*32];(s.ROOT/'jobs').mkdir()
+   for cid in ids:
+    folder=s.ROOT/'captures'/cid;folder.mkdir(parents=True);(folder/'meta.json').write_text('{}');(folder/'upload.webm').write_bytes(b'demo')
+   captured=[]
+   class Result: returncode=0;stdout='';stderr=''
+   def fake_run(cmd,**kwargs):captured.append(cmd);return Result()
+   with patch.object(s.subprocess,'run',side_effect=fake_run):
+    s.JOBS['one']={};s.run_job('one',ids,{'mode':'person','motion':False})
+    s.JOBS['two']={};s.run_job('two',ids,{'mode':'person','motion':True})
+   self.assertNotIn('--motion-correction',captured[0]);self.assertIn('--motion-correction',captured[1])
