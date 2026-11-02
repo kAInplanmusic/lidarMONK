@@ -49,3 +49,14 @@ class CloudModeTest(unittest.TestCase):
    try:
     line=p.stdout.readline();self.assertNotIn(token,line);self.assertIn('Cloud-Modus',line)
    finally:p.terminate();p.wait(timeout=5);p.stdout.close();p.stderr.close()
+
+class LanAddressTest(unittest.TestCase):
+ def test_ipv4_candidates_and_fallback(self):
+  import importlib.util
+  from unittest.mock import patch
+  spec=importlib.util.spec_from_file_location('local_server_addresses',Path(__file__).resolve().parents[1]/'server.py');s=importlib.util.module_from_spec(spec);spec.loader.exec_module(s)
+  class Result: stdout='127.0.0.1 192.168.1.22 192.168.1.22 fe80::1 172.17.0.1 invalid'
+  with patch.object(s.subprocess,'run',return_value=Result()):
+   self.assertEqual(s.lan_ipv4(),['192.168.1.22','172.17.0.1'])
+  with patch.object(s.subprocess,'run',side_effect=FileNotFoundError()):
+   self.assertEqual(s.lan_ipv4(),[])
