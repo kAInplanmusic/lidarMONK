@@ -9,6 +9,11 @@ spec=importlib.util.spec_from_file_location('backend',Path(__file__).resolve().p
 b=importlib.util.module_from_spec(spec);spec.loader.exec_module(b)
 
 class BackendTests(unittest.TestCase):
+    def test_sample_frames_spans_capture(self):
+        self.assertEqual(b.select_frames(1000, 10, 5), [0, 240, 490, 740, 990])
+        self.assertEqual(b.select_frames(11, 5, 5), [0, 5, 10])
+        self.assertEqual(b.select_frames(50, 2, 1), [0])
+
     def test_rigid_transform_validation(self):
         with tempfile.TemporaryDirectory() as td:
             p=Path(td)/'t.json';p.write_text(json.dumps(np.eye(4).tolist()));np.testing.assert_allclose(b.validate_transform(p),np.eye(4))
