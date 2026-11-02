@@ -35,3 +35,17 @@ class JobOptionsTest(unittest.TestCase):
     s.JOBS['one']={};s.run_job('one',ids,{'mode':'person','motion':False})
     s.JOBS['two']={};s.run_job('two',ids,{'mode':'person','motion':True})
    self.assertNotIn('--motion-correction',captured[0]);self.assertIn('--motion-correction',captured[1])
+
+class CloudModeTest(unittest.TestCase):
+ def test_cloud_rejects_missing_key(self):
+  with tempfile.TemporaryDirectory() as t:
+   env=os.environ.copy();env.pop('LIDARMONK_ACCESS_TOKEN',None)
+   p=subprocess.run([sys.executable,str(Path(__file__).resolve().parents[1]/'server.py'),'--cloud','--data',t],capture_output=True,text=True,env=env,timeout=5)
+   self.assertNotEqual(p.returncode,0);self.assertIn('LIDARMONK_ACCESS_TOKEN',p.stderr)
+ def test_cloud_requires_header_and_does_not_log_secret(self):
+  with tempfile.TemporaryDirectory() as t:
+   token='test-key-'+('a'*40);env=os.environ.copy();env['LIDARMONK_ACCESS_TOKEN']=token
+   p=subprocess.Popen([sys.executable,str(Path(__file__).resolve().parents[1]/'server.py'),'--cloud','--port','0','--data',t],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)
+   try:
+    line=p.stdout.readline();self.assertNotIn(token,line);self.assertIn('Cloud-Modus',line)
+   finally:p.terminate();p.wait(timeout=5);p.stdout.close();p.stderr.close()
