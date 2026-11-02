@@ -1,0 +1,120 @@
+Eine technische Analyse von Optik, LiDAR und 3D-Scanning-Pipelines
+Die kontinuierliche Weiterentwicklung mobiler Sensorik und eingebetteter Rechenarchitekturen hat Smartphones von reinen Kommunikationsgeräten zu hochpräzisen räumlichen Erfassungsplattformen transformiert. Das iPhone 18 Pro markiert in dieser Evolution einen bedeutenden Meilenstein: Durch das Zusammenspiel einer neu entwickelten Hauptkamerasensorik mit variabler physikalischer Blende, einem optischen dToF-LiDAR-System (Direct Time-of-Flight) sowie der Rechenleistung des im 2-Nanometer-Verfahren gefertigten A20 Pro Systems-on-Chip (SoC) definiert das Gerät die Grenzen mobiler Photogrammetrie, Videografie und 3D-Szenenrekonstruktion neu. [1][2][3][4][5]
+1. Technisches Sensor-Array und Hardware-Spezifikationen
+Die Erfassungsarchitektur des iPhone 18 Pro beruht auf einem integrierten Sensor-Array, das sowohl passive optische Daten im sichtbaren Spektrum als auch aktive Tiefeninformationen im nahen Infrarotbereich erfasst. Die primäre Datenerfassung erfolgt über drei rückseitige Kamerasensoren, ein optisches LiDAR-Modul sowie das vorderseitige TrueDepth-Sensorsystem. [1][2][3][4][5]
+Im Zentrum des optischen Upgrades steht der Sony IMX905 Hauptsensor mit einer nativen Pixelgröße von ￼ und 48 Megapixeln Auflösung. Erstmalig im Apple-Ökosystem integriert dieser Sensor eine mechatronisch gesteuerte variable Blende, die einen physischen Öffnungsbereich von ungefähr ￼ bis \text{f/4.0} abdeckt. [1][2][3][4][5]
+Diese physische Blendenverstellung bietet zwei fundamentale Vorteile für die optische Datenerfassung: Bei maximaler Öffnung (￼) steigt die Lichtausbeute auf dem gestapelten Sensor signifikant an, was das Rauschverhalten bei schlechten Lichtverhältnissen verbessert und eine rein optische Hintergrundtrennung ermöglicht. Das Abblenden auf ￼ reduziert den einfallenden Lichtstrom um mehr als zwei Blendenstufen (ca. 80 % Lichtreduktion). Dies erlaubt Filmemachern das Einhalten kinorelevanter Verschlusswinkel bei Tageslicht ohne den zwingenden Einsatz externer Neutraldichte-Filter (ND-Filter). Zudem erweitert das Abblenden die optische Schärfentiefe, was bei Makroaufnahmen und photogrammetrischen Scans eine durchgehende Objektschärfe ohne Unschärfeabfall an den Rändern sicherstellt. [1][2][3][4][5]
+Flankiert wird der Hauptsensor von einer 48-Megapixel-Ultra-Wide-Kamera (Sony IMX972) mit einer Brennweite von ￼ und einer Blende von ￼, die auch für hochauflösende Makroaufnahmen eingesetzt wird, sowie einem Tetraprisma-Teleobjektiv (Sony IMX973) mit 3D-Sensor-Shift-Bildstabilisierung. Das Teleobjektiv bietet einen nativen optischen Zoomfaktor von ￼ (￼) sowie eine optische Qualitätsstufe von ￼ (￼) bei einer Blende von ￼. [1][2][3][4][5]
+Der aktiven Tiefenerfassung dient der Sony IMX591 LiDAR-Empfänger, welcher mit einem VCSEL-Array (Vertical-Cavity Surface-Emitting Laser) gekoppelt ist. Der LiDAR-Scanner sendet getaktete Infrarot-Lichtpulse im Nanosekundenbereich aus und misst die Laufzeit der reflektierten Photonen (Direct Time-of-Flight), um Punktwolken der Umgebung in Echtzeit zu generieren. Die Vorderseite beherbergt zudem die 18-Megapixel Center Stage TrueDepth-Kamera (Sony IMX914) mit einer Blende von ￼ und integriertem Autofokus.
+Komponente / Sensor
+Modell / Spezifikation
+Optische Kennzahlen
+Hauptfunktion in der Erfassungs-Pipeline
+Hauptkamera (Fusion Main)
+Sony IMX905 (48\,\text{MP}, 1{,}22\,\mu\text{m})
+Variable Blende \text{f/1.4} bis \text{f/4.0}
+Hochauflösende Texturierung, optische Belichtungssteuerung
+Ultra-Wide Kamera
+Sony IMX972 (48\,\text{MP})
+13\,\text{mm} Äquivalent, \text{f/2.2}, 120^\circ FOV
+Weitwinkel-Photogrammetrie, Makro-Detailerfassung
+Telephoto Kamera
+Sony IMX973 (12\,\text{MP})
+100\,\text{[span_34](start_span)[span_34](end_span)[span_46](start_span)[span_46](end_span)mm} / 200\,\text{mm} Äquivalent, \text{f/2.8}, 3D OIS
+Erfassung distanzierter Objekte, parallaxenarme Aufnahmen
+LiDAR Scanner
+Sony IMX591 Receiver + VCSEL Emitter
+Nahes Infrarotspektrum (dToF) 
+Echtzeit-Tiefenkarte, Maßstabsstabilisierung, Feature-Tracking
+Frontkamera (TrueDepth)
+Sony IMX914 (18\,\text{MP})
+\text{f/1.9}, Center Stage Autofokus
+Nahbereichs-Gesichtsscan, Face ID Tiefenkartierung
+SoC / System-Compute
+Apple A20 Pro (2\,\text{nm} TSMC-Prozess)
+Dual 16-Core Neural Engine, 7-Core GPU
+On-Device Photogrammetrie, Gaussian Splatting Training
+
+Die rechnerische Verarbeitung dieser Sensorströme wird durch das A20 Pro System-on-Chip realisiert. Gefertigt im 2-Nanometer-Verfahren nutzt der Prozessor ein von M-Serie-Prozessoren inspiriertes Packaging für optimierte Wärmeableitung bei sustained Workloads. Die duale 16-Core Neural Engine verdoppelt die Rechenleistung für KI- und Computervision-Aufgaben im Vergleich zur Vorgängergeneration. Dies ermöglicht die simultane Ausführung komplexer Algorithmen – etwa die Verknüpfung von LiDAR-Tiefendaten mit den neuronalen Auswertungen des Kamerabildes – direkt auf dem Gerät, ohne dass thermisches Throttling bei längeren Scanning-Sitzungen einsetzt. [1][2][3][4][5][6]
+2. Foto-, Video- und Tiefenerfassungsmodi mit LiDAR-Unterstützung
+Das iPhone 18 Pro nutzt die Synergie aus optischen Sensoren und LiDAR-Tiefenmessung für unterschiedliche Aufnahmewege, die weit über traditionelle Standardfotografie hinausreichen. [1][2][3][4][5][6]
+Für anspruchsvolle fotografische Workflows integriert das Betriebssystem erweiterte Pro Controls, welche die manuelle Steuerung von Blende, Verschlusszeit, ISO-Empfindlichkeit, Weißabgleich sowie die Einblendung eines Echtzeit-Histogramms erlauben. Bei der Fotografie schützt das System vor Fehlfokussierung durch die Implementierung von Smart Focus Tracking. Hierbei unterstützt der LiDAR-Sensor die Autofokus-Pixel des IMX905-Sensors: Durch einen Doppeltipp auf das Subjekt hält die Kamera den Fokus selbst dann präzise aufrecht, wenn sich der Abstand dynamisch ändert oder das Objekt den Bildausschnitt kurzzeitig verlässt und wieder betritt. Durch Aufnahmen im Apple ProRAW- oder Apple Reference Image-Format bleiben ungepackte Sensordaten erhalten, die maximale Dynamik und Farbpräzision in der Nachbearbeitung gewährleisten. [1][2][3][4][5][6]
+Im Videobereich unterstützt das Gerät Aufnahmen in 4K Dolby Vision mit bis zu 120 Bilder pro Sekunde sowie ProRes RAW und Apple Log 2. Für Multi-Kamera-Produktionen im professionellen Filmumfeld ist eine Genlock-Unterstützung integriert. Genlock (Generator Locking) erlaubt die framegenaue Taktsynchronisation mehrerer iPhones oder Studiokameras. Der LiDAR-Scanner liefert während der Videoaufnahme kontinuierliche Tiefenkarten ab. Diese ermöglichen die exakte Trennung von Vorder- und Hintergrund im Cinematic Mode (bis 4K60 Dolby Vision), wobei der Fokussierungspunkt sowie die Stärke der optischen Unschärfe auch nach Aufnahmeschluss verändert werden können. [1][2][3][4][5][6]
+Bei der räumlichen Datenerfassung arbeitet das Gerät mit einer multimodalen Architektur. Der vorderseitige TrueDepth-Sensor projiziert ein Infrarot-Punktmuster zur hochauflösenden Geometrieerfassung von Gesichtern und kleinen Objekten im Nahbereich. Für Umgebungen und größere Räume misst der rückseitige IMX591 LiDAR-Scanner Distanzen bis ca. 5 Meter. Im Gegensatz zu rein passiven Photogrammetrie-Systemen arbeitet der LiDAR-Scanner unabhängig von den Umgebungslichtverhältnissen und erfasst Geometrien selbst bei absoluter Dunkelheit. [1][2][3][4][5][6]
+3. Stärken, Schwächen und physikalische Limitierungen der Rekonstruktion
+Für den professionellen Einsatz mobiler Erfassungsmethoden ist eine Differenzierung zwischen den physikalischen Eigenschaften von LiDAR, klassischer Photogrammetrie und neuartigen Radiance-Field-Ansätzen wie 3D Gaussian Splatting erforderlich. [1][2][3][4][5][6]
+Die wesentliche Stärke des LiDAR-Systems liegt in seiner absoluten Maßstabsgenauigkeit. Durch die physikalische Messung von Photonenlaufzeiten generiert der Scanner maßstabsgetreue Punktwolken mit einer Toleranz von unter ￼ (￼) bei Innenraum-Captures. Zudem ermöglicht das Verfahren die völlige Unabhängigkeit vom Umgebungslicht und bietet dem Anwender Echtzeit-Feedback auf dem Display, wodurch Lücken in der Abdeckung sofort erkannt werden. Die variable Blende unterstützt diesen Prozess, indem durch Abblenden auf ￼ eine tiefere Schärfenzone erreicht wird, die Bewegungsunschärfen in Texturaufnahmen minimiert. [1][2][3][4][5][6]
+Dennoch unterliegt das System physikalischen Restriktionen. Die räumliche Punkt-Abtastdichte des mobilen LiDARs ist um Größenordnungen geringer als die terrestrischer Präzisionsscanner (wie etwa einer Leica BLK360). Feine Kanten, filigrane Objekte oder komplexe Baudetails werden geometrisch geglättet oder gar nicht erfasst. Transparente Oberflächen wie Glas oder hochglänzende Reflexionsflächen brechen oder spiegeln den Infrarotstrahl abweichend, was zu Artefakten und Fehleschätzungen führt. Auf strukturlosen, monotonen Oberflächen (z. B. weisse Wände) kann zudem das optische Feature-Matching der Kamera fehlschlagen, was trotz intakter LiDAR-Messung zu Drift-Fehlern in der Raum-Odometrie führt.
+Parameter / Erfassungsart
+LiDAR Direct Time-of-Flight (dToF)
+Standard Photogrammetrie
+3D Gaussian Splatting (3DGS)
+Erfassungsgeschwindigkeit
+Extrem hoch (Echtzeit-Mesh)
+Langsam (benötigt hunderte Overlap-Fotos)
+Mittel bis hoch (kurzer Video-Sweep)
+Geometrische Präzision
+Hoch (absoluter Maßstab, <1{,}5\,\text{cm})
+Sehr hoch bei guten Texturen, aber skalierungsblind
+Geringe explizite Geometrie (repräsentiert als Ellipsoide)
+Lichtabhängigkeit
+Vollkommen lichtunabhängig
+Zwingend diffuses, helles Licht erforderlich
+Benötigt konsistente Belichtung
+Verarbeitungslokalität
+Vollständig On-Device möglich
+Oft Cloud-GPU erforderlich
+On-Device möglich (z. B. Scaniverse in ~60s)
+Glanz / Reflexionen
+Fehleranfällig bei Spiegelungen
+Verursacht schwere Mesh-Deformationen
+Exzellent (modelliert blickwinkelabhängigen Glanz)
+Hauptausgabeformat
+Mesh (OBJ/USDZ), Point Cloud (LAS/PLY)
+Dichtes Polygon-Mesh mit PBR-Texturen
+Point Cloud aus 3D-Gauss-Kugeln (PLY/SPZ)
+
+4. Modernes 3D-Scanning: Methoden und Algorithmen im Vergleich
+Die mathematische und rechnerische Rekonstruktion realer Szenen auf mobilen Endgeräten basiert auf drei unterschiedlichen methodischen Paradigmen.
+Beim Direct Time-of-Flight (dToF) Sensor Fusion emittiert das LiDAR-Modul periodische Infrarot-Lichtpulse. Die Messung der Photonenlaufzeit ￼ zur Single-Photon Avalanche Diode (SPAD) bestimmt die Distanz ￼ über die Beziehung:
+wobei ￼ die Lichtgeschwindigkeit darstellt. Durch die datentechnische Fusion dieser Distanzwerte mit den Messungen der Trägheitsmesseinheit (IMU) und den optischen Merkmalspunkten des Kamerabildes via Visual-Inertial Odometry (VIO) wird eine kontinuierliche Raumschätzung vollzogen, die direkt in geschlossene Dreiecksnetze (Meshes) überführt werden kann. [1][2][3][4][5][6][7]
+Die klassische Photogrammetrie (Structure-from-Motion & Multi-View Stereo) beruht auf der mathematischen Auswertung mehrfach überlappender 2D-Aufnahmen. Im ersten Prozessschritt (Structure-from-Motion, SfM) werden identische Feature-Punkte in verschiedenen Aufnahmen korreliert, um daraus die räumlichen Kamerapositionen sowie eine dünne Punktwolke zu berechnen. Anschließend berechnet das Multi-View Stereo (MVS) über Epipolargeometrie dichte Tiefenkarten für jedes Einzelbild. Durch Algorithmen wie die Poisson-Oberflächenrekonstruktion oder Marching Cubes werden diese Karten in hochauflösende Polygonnetze trianguliert und mit einer uv-geschnittenen Texturmap überzogen. [1][2][3][4][5][6][7]
+Das neuere 3D und 4D Gaussian Splatting (3DGS / 4DGS) ersetzt die explizite Dreiecksgeometrie durch ein kontinuierliches Strahlungsfeld (Radiance Field). Eine Szene wird dabei als ein Ensemble von Millionen dreidimensionaler Gauss-Verteilungen (Ellipsoide) modelliert. Jedes Gauss-Partikel ￼ ist definiert durch seinen Raummittelpunkt ￼, eine 3D-Kovarianzmatrix ￼ (zerlegt in Skalierung ￼ und Quaternion-Rotation ￼), eine Opazität ￼ sowie richtungsabhängige Farbwerte mittels sphärischer Harmonischer:
+Ein differenzierbarer GPU-Rasterisierer projiziert diese Partikel direkt in den Bildraum, was eine fotorealistische Darstellung von Glanz und Transparenzen bei extrem hohen Bildraten ermöglicht. Die zeitliche Erweiterung 4DGS nutzt Formate wie TSOG (Temporally and Spatially Ordered Gaussians), um Gauss-Zentren mit dynamischen Lifespan-Attributen und Trajektorien zu versehen. Dadurch lassen sich bewegte 3D-Sequenzen speichereffizient übertragen und abspielen. [1][2][3][4][5]
+5. Implementierung in iOS: APIs und System-Architektur
+Apple stellt Entwicklern im RealityKit- und ARKit-Framework native Programmierschnittstellen zur Verfügung, um Erfassungs- und Rekonstruktionsprozesse in Anwendungscode einzubinden. [1][2][3][4][5]
+Für das dreidimensionale Scannen isolierter Objekte bietet iOS die ⁠ObjectCaptureSession⁠-API. Diese Schnittstelle arbeitet als strukturierte Zustandsmaschine, die von der Initialisierung (⁠.initializing⁠) über die Bereitschaft (⁠.ready⁠) und Objekt-Detektion (⁠.detecting⁠) in den automatischen Aufnahme-Zustand (⁠.capturing⁠) übergeht. Nach Abschluss der Datenberechnung (⁠.finishing⁠) wird der Prozess im Status ⁠.completed⁠ beendet. Die SwiftUI-Komponente ⁠ObjectCaptureView⁠ führt den Nutzer visuell durch das Abtasten des Objekts. Während des Scans analysiert das System kontinuierlich Rückmeldungen (wie etwa ⁠.objectNotFlippable⁠, um festzustellen, ob das Objekt für die Unterseiterfassung gewendet werden darf). [1][2][3][4][5]
+Die eigentliche Rekonstruktion erfolgt im Anschluss lokal auf dem Gerät oder auf einem verbundenen Mac über die ⁠PhotogrammetrySession⁠.
+Für die Innenraumerfassung steht die RoomPlan API bereit. Diese verknüpft LiDAR-Tiefendaten und ARKit-Tracking, um Räume semantisch zu analysieren. Wände, Türen, Fenster sowie vordefinierte Einrichtungselemente werden automatisch erkannt und in parametrische 3D-USDZ-Modelle sowie maßhaltige 2D-Grundrisse überführt. [1][2][3][4][5][6]
+6. Praxiseinsatz und Software-Ökosysteme: Polycam & Scaniverse
+Im Bereich mobiler Scanning-Anwendungen haben sich Polycam und Scaniverse als führende Ökosysteme etabliert, die unterschiedliche Schwerpunkte in der Datennutzung setzen. [1][2][3][4][5][6]
+Polycam nutzt eine multi-modale Architektur für Architektur, Bauwesen (AEC) und Asset-Erstellung. Im Space Mode verarbeitet die App LiDAR-Daten zur direkten Generierung von Raum-Geometrien. Eine wesentliche Funktion ist das Extend-Werkzeug, welches das Erweitern bestehender Scans in späteren Sitzungen ermöglicht, ohne dass der räumliche Bezug des Koordinatensystems verloren geht. Für feine Einzelobjekte schaltet die App in den photogrammetrischen Object Mode. Polycam bietet zudem einen interaktiven Grundriss-Editor mit Bibliothekselementen und exportiert Daten in professionelle CAD- und BIM-Formate wie DXF, LAS, Geo-LAS, PLY und USDZ. [1][2][3][4][5][6]
+Scaniverse (von Niantic Spatial) ist auf die Erzeugung und Verbreitung von 3D Gaussian Splats fokussiert. Die Anwendung führt das Training von Gaussian Splats vollständig lokal auf der Neural Engine des A20 Pro in etwa 60 bis 90 Sekunden durch. Zur effizienten Datenhaltung nutzt Scaniverse das quelloffene ⁠.spz⁠-Dateiformat. Dieses komprimiert massive PLY-Splat-Dateien um durchschnittlich 90 % (10-fache Verringerung der Dateigröße) bei minimalen optischen Einbußen. Dies wird durch Quantisierung der Raumkoordinaten, Quaternionen-Komprimierung und Kodierung der sphärischen Harmonischen erzielt. Formate dieser Art lassen sich anschließend direkt in WebXR-Umgebungen und 3D-Engines wie Babylon.js oder PlayCanvas einbinden. [1][2][3][4][5][6]
+7. Performance-Optimierung, Rigging, Masking und Web-Architekturen
+Der Praxiseinsatz mobiler Scans in Echtzeit-Engines oder Webanwendungen erfordert eine strukturierte Pipeline zur Datenreduktion und Vorbereitung. [1][2][3][4][5][6]
+Vor Beginn der Aufzeichnung muss das Ziel-Level of Development (LOD) definiert werden. Während LOD 200 bis 300 für die reine Raumplanung und Machbarkeitsstudien ausreicht und mit LiDAR-Scans abgedeckt wird, erfordern strukturelle Koordinationen ab LOD 350+ höhere Messgenauigkeiten oder terrestrische Ergänzungsscans. Zur Polygonoptimierung werden Mesh-Dezimierungsverfahren eingesetzt, die ebene Flächen vereinfachen, während Formkanten ihre Netzdichte behalten.
+Zur Vermeidung von Umgebungsrauschen nutzt die ⁠ObjectCaptureSession⁠ automatisierte Maskierungsmechanismen. Die Neural Engine segmentiert das Hauptobjekt visuell vom Hintergrund, während der LiDAR-Scanner eine physische Tiefengrenze um die Bounding-Box legt. Pixel außerhalb dieses Bereichs werden maskiert, wodurch vermieden wird, dass nebensächliche Raumelemente in die Rekonstruktionsberechnung einfließen. [1][2][3][4][5][6]
+Um statische 3D-Scans in Animatables zu überführen, werden Dreiecksnetze über Quad-Remeshing in gleichmäßige Vierecksnetze transformiert und mit Skelett-Knochen (Bones) versehen. Bei 3D Gaussian Splats, die keine native Dreiecksstruktur besitzen, kommen Werkzeuge wie Gaussian Frosting oder SuGaR zum Einsatz, welche eine konsistente Polygon-Oberfläche aus der Partikelwolke extrahieren und die Gauss-Kugeln als Textur-Skin an das animierbare Mesh binden. [1][2][3][4][5][6]
+Im Webbrowser erfolgt die Darstellung komprimierter ⁠.spz⁠-Dateien über WebGL 2.0 oder WebGPU. Da Splats keine Polygone besitzen, sortieren WGSL-Compute-Shader die Partikel auf der GPU entlang der Blickrichtung (Z-Achse) mittels Radix-Sort und projizieren sie als transparente Quads. Für die Auswahl von Objekten im 3D-Raum greifen Web-Editoren auf GPU-Picking zurück, bei dem verdeckte Proxy-Meshes zur Identifikation angeklickter Splat-Gruppen genutzt werden.
+Für enterprise-seitige Automatisierungen bieten Plattformen wie Polycam REST-Schnittstellen wie die Reconstruction API (zum Upload von Bildsequenzen und automatischen Erstellen von 3D-Modellen in der Cloud) sowie die Content API (zur Einbindung des spatialen Asset-Archivs in bestehende Datenbanken) an. [1][2][3][4][5]
+8. Strategische Schlussfolgerungen
+Das iPhone 18 Pro demonstriert die Konvergenz von optischer Feinmechanik, aktiver Laufzeitsensorik und eingebetteten Computervision-Architekturen. Die Integration der variablen physischen Blende schließt eine wesentliche Lücke im mobilen Aufnahmesegment, da sie eine präzise optische Belichtungs- und Schärfentiefekontrolle erlaubt. [1][2][3][4][5]
+Für die professionelle Praxis ergeben sich daraus drei zentrale Handlungsempfehlungen:
+Erstens sollte die Erfassungsmethode strikt nach den geometrischen Anforderungen gewählt werden. LiDAR eignet sich optimal für maßstabsgenaue Raumdokumentationen und schnelle Grundriss-Analysen. Klassische Photogrammetrie bietet die höchste Schärfe für statische Einzelobjekte, während 3D Gaussian Splatting das bevorzugte Verfahren für fotorealistische, blickwinkelabhängige Visualisierungen spiegelnder Szenen im Webbereich darstellt. [1][2][3][4][5]
+Zweitens empfiehlt sich für Web-Pipelines die Nutzung komprimierter Open-Source-Formate wie ⁠.spz⁠ und TSOG, um extrem speichereffiziente und flüssige Datentransfers zu gewährleisten.
+Drittens ermöglicht die Einbindung native System-APIs (⁠ObjectCaptureSession⁠, RoomPlan) in Verbindung mit Cloud-Reconstruction-APIs den Aufbau vollständig automatisierter Datenverarbeitungsketten – vom Vor-Ort-Scan mit dem iPhone 18 Pro bis zum finaleinsatzfähigen CAD- oder WebXR-Asset.
+
+1, https://www.macrumors.com/roundup/iphone-18-pro/ (iPhone 18 Pro: Everything We Know | MacRumors)
+2, https://beastgrip.com/blogs/news/iphone-18-pro-camera-rumors-what-we-re-most-excited-about-for-mobile-filmmaking (iPhone 18 Pro Camera Rumors: What We're Most Excited About for)
+3, https://www.notebookcheck.net/Exclusive-Diagnostics-log-confirms-iPhone-18-Pro-Max-camera-specs-ahead-of-launch.1344805.0.html (Diagnostics log confirms iPhone 18 Pro Max camera specs ahead of)
+4, https://www.91mobiles.com/hub/iphone-18-pro-max-camera-specs-tipped-fresh-leak/ (iPhone 18 Pro Max camera specs tipped in fresh leak, variable)
+5, https://www.reddit.com/r/iphone/comments/1uyujex/diagnostics_log_confirms_iphone_18_pro_max_camera/ (Diagnostics log confirms iPhone 18 Pro Max camera Specs Ahead)
+6, https://www.apple.com/iphone-18-pro/specs/ (iPhone 18 Pro and 18 Pro Max - Technical Specifications - Apple)
+7, https://www.reddit.com/r/iphone/comments/1uyujex/diagnostics_log_confirms_iphone_18_pro_max_camera/ (Diagnostics log confirms iPhone 18 Pro Max camera Specs Ahead)
+8, https://www.apple.com/iphone-18-pro/specs/ (iPhone 18 Pro and 18 Pro Max - Technical Specifications - Apple)
+9, https://www.apple.com/iphone-18-pro/specs/ (iPhone 18 Pro and 18 Pro Max - Technical Specifications - Apple)
+10, https://poly.cam/blog/lidar-vs-photogrammetry-which-3d-scanning-method-is-right-for-you (LiDAR vs. Photogrammetry: Which 3D Scanning Method Is Right for)
+11, https://poly.cam/blog/lidar-vs-photogrammetry-which-3d-scanning-method-is-right-for-you (LiDAR vs. Photogrammetry: Which 3D Scanning Method Is Right for)
+12, https://arxiv.org/html/2607.28049v1 (TSOG: A format for Temporally and Spatially Ordered Gaussians)
+13, https://doc.babylonjs.com/features/featuresDeepDive/mesh/gaussianSplatting (Gaussian Splatting | Babylon.js Documentation)
+14, https://forum.babylonjs.com/t/new-feature-niantic-spz-gaussian-splatting-and-spherical-harmonics/55124 (Niantic .SPZ Gaussian Splatting and Spherical Harmonics)
