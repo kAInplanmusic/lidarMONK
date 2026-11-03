@@ -1,0 +1,48 @@
+{
+  "manifest_version": "1.0",
+  "project_id": "391f1198200b3da4",
+  "created_at": "2026-11-02T22:44:34+0100",
+  "max_seconds": 300,
+  "voxel_m": 0.02,
+  "captures": [
+    {
+      "id": "beeb2c44",
+      "source_type": "stray",
+      "path": "test-data/captures/test_stray",
+      "checksum": "0c29d08c87b00a5056318114af59f5156f5e8b8a316603fdddfaf91dc4670e24",
+      "frames_total": null,
+      "frames_used": 0,
+      "selection": []
+    },
+    {
+      "id": "0a3d2456",
+      "source_type": "stray",
+      "path": "test-data/captures/test_wurld",
+      "checksum": "20152fadef6ac1f1eba444469dbcdacea4f43100e622d0dd875ebf4186ecbc29",
+      "frames_total": null,
+      "frames_used": 0,
+      "selection": []
+    },
+    {
+      "id": "de373a0a",
+      "source_type": "stray",
+      "path": "test-data/captures/test_splatcapture",
+      "checksum": "1c5e01b163f0c649291b9ac044b806c971b2185f41829366e2c6489d91da5533",
+      "frames_total": null,
+      "frames_used": 0,
+      "selection": []
+    }
+  ],
+  "results": {
+    "status": "completed",
+    "elapsed": 0.032557010650634766,
+    "captures": 3,
+    "points": 0,
+    "fusion_time_seconds": 0,
+    "warnings": [
+      "Controller-Prototyp: Punktwolken-Registrierung vereinfacht.",
+      "RGB und Confidence werden nicht fusioniert.",
+      "Bewegungskorrektur nicht implementiert."
+    ]
+  }
+}
